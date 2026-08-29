@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS Стрелялка — Заброшенный завод</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; pointer-events: none; z-index: 10; transform: translate(-50%, -50%); transition: transform 0.05s ease-out; }
+        #crosshair .line { position: absolute; background: white; box-shadow: 0 0 2px rgba(0,0,0,0.5); border-radius: 1px; transition: all 0.1s ease-out; }
+        #crosshair .line.top { width: 2px; height: 8px; left: 14px; top: 0; }
+        #crosshair .line.bottom { width: 2px; height: 8px; left: 14px; bottom: 0; }
+        #crosshair .line.left { width: 8px; height: 2px; left: 0; top: 14px; }
+        #crosshair .line.right { width: 8px; height: 2px; right: 0; top: 14px; }
+        #crosshair .dot { position: absolute; width: 4px; height: 4px; background: white; border-radius: 50%; left: 13px; top: 13px; box-shadow: 0 0 3px rgba(0,0,0,0.7); transition: all 0.1s ease-out; }
+        #crosshair.fired .line.top { height: 12px; top: -4px; }
+        #crosshair.fired .line.bottom { height: 12px; bottom: -4px; }
+        #crosshair.fired .line.left { width: 12px; left: -4px; }
+        #crosshair.fired .line.right { width: 12px; right: -4px; }
+        #crosshair.fired .dot { width: 6px; height: 6px; left: 12px; top: 12px; }
+        #crosshair.hit .line { background: #ff5555; }
+        #crosshair.hit .dot { background: #ff5555; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.7); z-index: 10; user-select: none; }
+        #health { color: #ff5555; }
+        #ammo { position: absolute; bottom: 40px; right: 40px; color: white; font-size: 28px; text-shadow: 2px 2px 4px rgba(0,0,0,0.7); z-index: 10; user-select: none; }
+        #reloadIndicator { position: absolute; bottom: 80px; right: 40px; color: #ffaa00; font-size: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.7); z-index: 10; display: none; user-select: none; }
+        #instructions { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; font-size: 18px; z-index: 10; pointer-events: none; display: none; }
+        #menu, #shop, #settings, #levelSelect { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 30; color: white; text-align: center; }
+        #menu h1 { font-size: 56px; margin: 0; text-shadow: 4px 4px 8px black; }
+        #menu p { font-size: 24px; margin: 10px 0 30px; }
+        .menu-btn { padding: 15px 40px; font-size: 28px; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background 0.3s; margin: 10px; }
+        .menu-btn:hover { background: #45a049; }
+        #gameoverText { display: none; font-size: 28px; margin: 0 0 20px; color: #ff5555; text-shadow: 2px 2px 4px black; }
+        #shop h2, #settings h2, #levelSelect h2 { font-size: 40px; margin: 0 0 20px; }
+        #weaponList { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; max-width: 800px; margin-bottom: 30px; }
+        .weapon-card { background: rgba(255,255,255,0.1); border: 2px solid #555; border-radius: 10px; padding: 15px; width: 200px; cursor: pointer; transition: border-color 0.3s; }
+        .weapon-card.selected { border-color: #4CAF50; }
+        .weapon-card h3 { margin: 0 0 10px; }
+        .weapon-card p { margin: 5px 0; }
+        .weapon-card button { margin-top: 10px; padding: 8px 15px; font-size: 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .weapon-card button:disabled { background: #777; cursor: not-allowed; }
+        #backButton, #backFromSettingsButton, #backFromLevelSelectButton { background: #f44336; }
+        #backButton:hover, #backFromSettingsButton:hover, #backFromLevelSelectButton:hover { background: #d32f2f; }
+        #balanceDisplay { position: absolute; top: 20px; right: 20px; font-size: 24px; color: #ffd700; }
+        #bossMessage { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; color: #ff0000; text-shadow: 4px 4px 8px black; z-index: 15; display: none; pointer-events: none; }
+        #levelMessage { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); font-size: 36px; color: #00ff00; text-shadow: 3px 3px 6px black; z-index: 15; display: none; pointer-events: none; }
+        #bossHealthBar { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); width: 50%; height: 20px; background: rgba(0,0,0,0.7); border: 2px solid #ff0000; border-radius: 10px; z-index: 20; display: none; pointer-events: none; }
+        #bossHealthBarFill { height: 100%; background: #ff0000; width: 100%; border-radius: 8px; transition: width 0.1s; }
+        #volumeSlider { width: 200px; margin: 20px; }
+        .level-btn { padding: 20px 60px; font-size: 36px; margin: 15px; background: #4CAF50; color: white; border: none; border-radius: 10px; cursor: pointer; transition: background 0.3s; }
+        .level-btn:hover { background: #45a049; }
+        .level-btn.locked { background: #777; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div id="ui">Монеты: <span id="coins">0</span> | Здоровье: <span id="health">100</span> | Убийств: <span id="kills">0</span> | Уровень: <span id="level">1</span></div>
+    <div id="ammo">30 / 90</div>
+    <div id="reloadIndicator">ПЕРЕЗАРЯДКА...</div>
+    <div id="crosshair">
+        <div class="line top"></div>
+        <div class="line bottom"></div>
+        <div class="line left"></div>
+        <div class="line right"></div>
+        <div class="dot"></div>
+    </div>
+    <div id="instructions">Кликните для захвата мыши | WASD — движение | Пробел — прыжок | ЛКМ — огонь | R — перезарядка | M — музыка | Esc — выход в меню</div>
+
+    <div id="menu">
+        <h1>FPS Стрелялка</h1>
+        <p>Заброшенный завод</p>
+        <div id="gameoverText">ИГРА ОКОНЧЕНА</div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+            <button class="menu-btn" id="startButton">Играть</button>
+            <button class="menu-btn" id="shopButton">Магазин</button>
+            <button class="menu-btn" id="settingsButton">Настройки</button>
+            <button class="menu-btn" id="levelSelectButton">Выбор уровня</button>
+        </div>
+    </div>
+
+    <div id="shop" style="display: none;">
+        <h2>Магазин оружия</h2>
+        <div id="weaponList"></div>
+        <button class="menu-btn" id="backButton">Назад</button>
+    </div>
+
+    <div id="settings" style="display: none;">
+        <h2>Настройки</h2>
+        <label for="volumeSlider">Громкость музыки: <span id="volumeValue">50</span>%</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="50">
+        <button class="menu-btn" id="backFromSettingsButton">Назад</button>
+    </div>
+
+    <div id="levelSelect" style="display: none;">
+        <h2>Выбор уровня</h2>
+        <button class="level-btn" id="level1Btn">Уровень 1</button>
+        <button class="level-btn" id="level2Btn">Уровень 2</button>
+        <button class="menu-btn" id="backFromLevelSelectButton">Назад</button>
+    </div>
+
+    <div id="balanceDisplay">Баланс: <span id="balance">0</span> монет</div>
+    <div id="bossMessage">БОСС ПОЯВИЛСЯ!</div>
+    <div id="levelMessage">УРОВЕНЬ 2</div>
+    <div id="bossHealthBar">
+        <div id="bossHealthBarFill"></div>
+    </div>
+
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://www.chosic.com/wp-content/uploads/2022/03/alex-productions-epic-cinematic-trailer-elite(chosic.com).mp3" type="audio/mpeg">
+    </audio>
+    <audio id="katanaSound" preload="auto">
+        <source src="https://bruniafx.ru/audiofiles/206/103740473.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="zombieAttackSound" preload="auto">
+        <source src="https://melonradio.ru/uploads/yx1aa26wuadtz62zl0zcrv4wr0al2r.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="deathSound" preload="auto">
+        <source src="https://bruniafx.ru/audiofiles/206/103737383.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="m416ShootSound" loop preload="auto">
+        <source src="https://zvukitop.com/wp-content/uploads/2021/05/strelba-avtomata-4.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="ammoPickupSound" preload="auto">
+        <source src="https://bruniafx.ru/audiofiles/218/109853890.mp3" type="audio/mpeg">
+    </audio>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+
+    <script>
+        // ========== ХРАНИЛИЩЕ ==========
+        function safeGet(key, defaultValue) {
+            try {
+                const value = localStorage.getItem(key);
+                if (key === 'ownedWeapons') return value ? JSON.parse(value) : defaultValue;
+                return value !== null ? parseInt(value) : defaultValue;
+            } catch (e) { return defaultValue; }
+        }
+        function safeSet(key, value) { try { localStorage.setItem(key, value.toString()); } catch (e) {} }
+
+        // ========== НАСТРОЙКИ ==========
+        const PLAYER_HEIGHT = 1.7;
+        const MOVE_SPEED = 8.0;
+        const ENEMY_SPAWN_INTERVAL = 3;
+        const MAX_ENEMIES = 15;
+        const SPAWN_DISTANCE = 20;
+        const BULLET_RANGE = 100;
+        const ITEM_SPAWN_INTERVAL = 8;
+        const MAX_ITEMS = 5;
+        const ITEM_LIFETIME = 20;
+        const PICKUP_DISTANCE = 2.0;
+        const ITEM_SPAWN_RADIUS_MIN = 10;
+        const ITEM_SPAWN_RADIUS_MAX = 40;
+        const GRAVITY = 20;
+        const JUMP_SPEED = 8;
+        const BOSS_TRIGGER_KILLS = 70;
+        const PLAYER_LIMIT = 90;
+
+        // ========== ОРУЖИЕ ==========
+        const weaponsData = {
+            m416: { name: 'M416', cost: 0, fireRate: 0.09, magazineSize: 30, totalAmmo: 90, reloadTime: 2.2, spreadAngle: 0.02, damage: 1, automatic: true, melee: false },
+            pistol: { name: 'Пистолет', cost: 100, fireRate: 0.35, magazineSize: 12, totalAmmo: 60, reloadTime: 1.5, spreadAngle: 0.01, damage: 1, automatic: false, melee: false },
+            shotgun: { name: 'Дробовик', cost: 300, fireRate: 1.0, magazineSize: 6, totalAmmo: 30, reloadTime: 3.0, spreadAngle: 0.05, damage: 2, falloffDistance: 5, automatic: false, melee: false },
+            katana: { name: 'Катана', cost: 750, fireRate: 0.5, magazineSize: Infinity, totalAmmo: Infinity, reloadTime: 0, spreadAngle: 0, damage: 2, automatic: false, melee: true, range: 3.0 }
+        };
+
+        // ========== ПРОГРЕСС ==========
+        let coins = safeGet('coins', 0);
+        let ownedWeapons = safeGet('ownedWeapons', ['m416']);
+        let selectedWeapon = safeGet('selectedWeapon', 'm416');
+        if (!ownedWeapons.includes(selectedWeapon)) selectedWeapon = 'm416';
+
+        let savedLevel = safeGet('savedLevel', 1);
+        let maxUnlockedLevel = safeGet('maxUnlockedLevel', 1);
+        let musicVolume = safeGet('musicVolume', 50);
+
+        const player = {
+            health: 100, yaw: 0, pitch: 0,
+            position: new THREE.Vector3(0, PLAYER_HEIGHT, 5),
+            ammoInMag: weaponsData[selectedWeapon].magazineSize,
+            totalAmmo: weaponsData[selectedWeapon].totalAmmo,
+            isReloading: false, reloadTimer: 0, lastShotTime: 0, selectedWeapon: selectedWeapon,
+            vy: 0, isGrounded: true, jumpPressed: false,
+            kills: 0
+        };
+
+        let boss = null;
+        let bossSpawned = false;
+        let portal = null;
+        let currentLevel = savedLevel;
+        let levelConfig = {};
+
+        const bossHealthBar = document.getElementById('bossHealthBar');
+        const bossHealthBarFill = document.getElementById('bossHealthBarFill');
+
+        function showBossHealthBar() { bossHealthBar.style.display = 'block'; }
+        function hideBossHealthBar() { bossHealthBar.style.display = 'none'; }
+        function updateBossHealthBar() {
+            if (!boss) { hideBossHealthBar(); return; }
+            const maxHealth = levelConfig.bossHealth;
+            const currentHealth = Math.max(0, boss.userData.health);
+            const percent = (currentHealth / maxHealth) * 100;
+            bossHealthBarFill.style.width = percent + '%';
+            showBossHealthBar();
+        }
+
+        // ========== АУДИО ==========
+        const bgMusic = document.getElementById('bgMusic');
+        const katanaSound = document.getElementById('katanaSound');
+        const zombieAttackSound = document.getElementById('zombieAttackSound');
+        const deathSound = document.getElementById('deathSound');
+        const m416ShootSound = document.getElementById('m416ShootSound');
+        const ammoPickupSound = document.getElementById('ammoPickupSound');
+        let musicEnabled = true;
+
+        function setMusicVolume(volumePercent) {
+            musicVolume = volumePercent;
+            bgMusic.volume = volumePercent / 100;
+            safeSet('musicVolume', volumePercent);
+            document.getElementById('volumeValue').textContent = volumePercent;
+            document.getElementById('volumeSlider').value = volumePercent;
+        }
+        function toggleMusic() {
+            if (musicEnabled) { bgMusic.pause(); musicEnabled = false; }
+            else { bgMusic.play().catch(() => {}); musicEnabled = true; }
+        }
+        function startMusic() { if (musicEnabled) { bgMusic.volume = musicVolume / 100; bgMusic.play().catch(() => {}); } }
+        function stopMusic() { bgMusic.pause(); bgMusic.currentTime = 0; }
+        setMusicVolume(musicVolume);
+
+        function stopM416Sound() {
+            if (m416ShootSound) {
+                m416ShootSound.pause();
+                m416ShootSound.currentTime = 0;
+            }
+        }
+
+        // ========== ЗАГРУЗКА МОДЕЛЕЙ ==========
+        let zombieModel = null;
+        let zombieAnimations = []; // <-- добавляем массив для анимаций
+        let m416Model = null;
+        const gltfLoader = new THREE.GLTFLoader();
+
+        // Загрузка модели зомби с GitHub и автоматическим масштабированием
+        gltfLoader.load(
+            'https://raw.githubusercontent.com/magomed111mag-jpg/wawawaw/refs/heads/main/ASJLBAK91AMID6A7855D0HM1D.glb',
+            (gltf) => {
+                zombieModel = gltf.scene;
+                zombieAnimations = gltf.animations; // <-- сохраняем анимации
+                // Автоматически подбираем масштаб, чтобы модель была около 1.7 метра высотой
+                const box = new THREE.Box3().setFromObject(zombieModel);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const desiredHeight = 1.7; // примерно рост зомби
+                const scale = desiredHeight / maxDim;
+                zombieModel.scale.set(scale, scale, scale);
+                // Центрируем модель по вертикали
+                const center = box.getCenter(new THREE.Vector3());
+                zombieModel.position.y = -center.y * scale;
+                console.log('Модель зомби загружена и отмасштабирована');
+                if (gameActive) {
+                    enemies.forEach(e => scene.remove(e));
+                    enemies.length = 0;
+                    for (let i = 0; i < 8; i++) spawnEnemy();
+                    if (boss) { scene.remove(boss); boss = createBossZombie(); scene.add(boss); }
+                }
+            },
+            undefined,
+            (error) => console.error('Ошибка загрузки модели зомби:', error)
+        );
+
+        // Загрузка модели M416 (оставлена прежняя)
+        gltfLoader.load(
+            'https://files.catbox.moe/wbdurv.glb',
+            (gltf) => {
+                m416Model = gltf.scene;
+                m416Model.scale.set(0.01, 0.01, 0.01);
+                console.log('Модель M416 загружена');
+                if (selectedWeapon === 'm416' && gameActive) setWeapon('m416');
+            },
+            undefined,
+            (error) => console.error('Ошибка загрузки модели M416:', error)
+        );
+
+        // Продолжение следует во второй части...
